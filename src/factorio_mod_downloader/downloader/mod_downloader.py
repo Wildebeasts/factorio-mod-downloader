@@ -30,12 +30,78 @@ from factorio_mod_downloader.downloader.helpers import is_website_up
 BASE_FACTORIO_MOD_URL: Final = "https://mods.factorio.com/mod"
 BASE_MOD_URL: Final = "https://re146.dev/factorio/mods/en#"
 BASE_DOWNLOAD_URL: Final = "https://mods-storage.re146.dev"
+FACTORIO_API_URL: Final = "https://re146.dev/factorio/mods/modinfo?id={name}"
+
+
+def fetch_dependencies_via_api(mod_name: str, include_optional: bool = False, selected_optional: Set[str] = None):
+    """
+    Fetch required (and optionally selected optional) dependencies via the official API.
+    Returns:
+        required_mods: list of mod names
+        optional_mods: list of mod names
+    """
+    if selected_optional is None:
+        selected_optional = set()
+
+    try:
+        url = FACTORIO_API_URL.format(name=mod_name)
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+
+        releases = data.get("releases", [])
+        if not releases:
+            return [], []
+
+        # Latest release is the last in the list
+        latest_deps: List[str] = releases[-1].get("info_json", {}).get("dependencies", [])
+
+        required_mods = []
+        optional_mods = []
+
+        for dep in latest_deps:
+            # dep looks like "? base >= 1.0" or "~ flib" or "! incompatible"
+            dep = dep.strip()
+            if dep.startswith("!"):
+                # Incompatible
+                continue
+            
+            # Extract just the mod name
+            # strip leading special markers (?(~ etc) and split out version constraint
+            # A typical dep string is like "? optional-mod >= 1.0" or "~ req-mod" or "req-mod"
+            
+            # Remove leading specifiers: '?', '(', ')', '~'
+            clean_str = dep.lstrip("?(~")
+            
+            # If it had a closing parenthesis from '(?)', drop it
+            if clean_str.startswith(")"):
+                clean_str = clean_str[1:]
+                
+            clean_str = clean_str.strip()
+            
+            # Mod name is the first token before operators like >=, <=, =, <, >
+            name = clean_str.split(" >= ")[0].split(" <= ")[0].split(" = ")[0].split(" < ")[0].split(" > ")[0].strip()
+
+            if name.lower() == "base":
+                continue
+
+            if dep.startswith("?") or dep.startswith("(?)"):
+                optional_mods.append(name)
+            else:
+                required_mods.append(name)
+
+        return required_mods, optional_mods
+
+    except requests.HTTPError as e:
+        raise Exception(f"API error ({e.response.status_code}) for '{mod_name}'.") from e
+    except Exception as e:
+        raise Exception(f"Error fetching API deps for '{mod_name}': {e}") from e
 
 
 class ModDownloader(Thread):
     """Thread-based mod downloader with dependency resolution."""
 
-    def __init__(self, mod_url: str, output_path: str, app):
+    def __init__(self, mod_url: str, output_path: str, app, selected_optional_deps: Set[str] = None):
         """
         Initialize the mod downloader.
 
@@ -43,6 +109,7 @@ class ModDownloader(Thread):
             mod_url: URL of the mod to download
             output_path: Directory to save downloaded mods
             app: Reference to the GUI application
+            selected_optional_deps: Set of optional dependency names to include.
         """
         super().__init__()
         self.daemon = True
@@ -54,7 +121,7 @@ class ModDownloader(Thread):
         self.analyzed_mods: Set[str] = set()
         self.chrome_options: Options = None
         self.download_threads = []
-        self.include_optional = self.app.optional_deps.get()
+        self.selected_optional_deps = selected_optional_deps or set()
 
     def run(self):
         """Execute the download process."""
@@ -257,7 +324,7 @@ class ModDownloader(Thread):
 
     def get_required_dependencies(self, mod_name: str) -> List[Tuple[str, str]]:
         """
-        Fetch required dependencies for a mod.
+        Fetch required dependencies for a mod using the Factorio API.
 
         Args:
             mod_name: Name of the mod
@@ -265,34 +332,24 @@ class ModDownloader(Thread):
         Returns:
             List of (dependency_name, dependency_url) tuples
         """
-        dependency_url = (
-            f"{BASE_FACTORIO_MOD_URL}/{mod_name}/dependencies?direction=out&sort=idx&filter=all"
-        )
-
         try:
-            soup = self.get_page_source(dependency_url, is_dependency_check=True)
-            if not soup:
-                self.log_info(f"Could not fetch dependencies for {mod_name}\n")
-                return []
+            req_mods, opt_mods = fetch_dependencies_via_api(mod_name)
+            final_deps = []
 
-            required_mods = []
+            for name in req_mods:
+                mod_url = f"{BASE_MOD_URL}{BASE_FACTORIO_MOD_URL}/{name}"
+                final_deps.append((name, mod_url))
 
-            links = soup.find_all("a", class_="mod-dependencies-required")
-            for link in links:
-                dep_name = link.get_text(strip=True)
-                mod_url = f"{BASE_MOD_URL}{BASE_FACTORIO_MOD_URL}/{dep_name}"
-                required_mods.append((dep_name, mod_url))
+            if self.selected_optional_deps:
+                for name in opt_mods:
+                    if name in self.selected_optional_deps:
+                        mod_url = f"{BASE_MOD_URL}{BASE_FACTORIO_MOD_URL}/{name}"
+                        final_deps.append((name, mod_url))
 
-            if self.include_optional:
-                for link in soup.find_all("a", class_="mod-dependencies-optional"):
-                    dep_name = link.get_text(strip=True)
-                    mod_url = f"{BASE_MOD_URL}{BASE_FACTORIO_MOD_URL}/{dep_name}"
-                    required_mods.append((dep_name, mod_url))
-
-            return required_mods
+            return final_deps
 
         except Exception as e:
-            self.log_info(f"Could not fetch dependencies for {mod_name}: {e}\n")
+            self.log_info(f"{e}\n")
             return []
 
     def download_file(self, url: str, file_path: str, file_name: str):
@@ -480,3 +537,41 @@ class ModDownloader(Thread):
         self.app.textbox.insert("end", info)
         self.app.textbox.yview("end")
         self.app.textbox.configure(state="disabled")
+class DependencyFetcher(Thread):
+    """
+    Fetches mod dependencies via the official Factorio Mod Portal REST API.
+    No Selenium / headless Chrome required — pure HTTP JSON request.
+    """
+
+    FACTORIO_API_URL = "https://mods.factorio.com/api/mods/{name}"
+
+    def __init__(self, mod_url: str, app):
+        super().__init__()
+        self.daemon = True
+        self.app = app
+        self.mod = mod_url.split("/")[-1]
+
+    def run(self):
+        try:
+            self.log_info(f"Fetching dependencies for {self.mod} via API...\n")
+
+            req_mods, opt_mods = fetch_dependencies_via_api(self.mod)
+
+            self.log_info(
+                f"Found {len(req_mods)} required, {len(opt_mods)} optional dependencies.\n"
+            )
+            self.app.BodyFrame.after(
+                0, lambda r=req_mods, o=opt_mods: self.app.BodyFrame.on_deps_fetched(r, o)
+            )
+
+        except Exception as e:
+            msg = str(e).split(chr(10))[0]
+            self.log_info(f"Error fetching API deps for '{self.mod}': {msg}\n")
+            self.app.BodyFrame.after(0, lambda: self.app.BodyFrame.on_deps_failed(msg))
+
+    def log_info(self, info: str):
+        self.app.textbox.configure(state="normal")
+        self.app.textbox.insert("end", info)
+        self.app.textbox.yview("end")
+        self.app.textbox.configure(state="disabled")
+

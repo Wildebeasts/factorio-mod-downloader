@@ -42,15 +42,15 @@ class DownloadEntry:
     def mark_complete(self):
         """Mark the download as complete."""
         self.icon_label.configure(image=success_icon)
-        self.sub_label.configure(text="Completed successfully.")
+        self.sub_label.configure(text="Completed successfully.", text_color="#65A63F")
         self.progress_bar.set(1.0)
-        self.progress_bar.configure(progress_color="#4CAF50")  # green
+        self.progress_bar.configure(progress_color="#65A63F")  # factorio green
 
     def mark_failed(self, error_msg: str):
         """Mark the download as failed."""
         self.icon_label.configure(image=error_icon)
-        self.sub_label.configure(text=f"Error: {error_msg}")
-        self.progress_bar.configure(progress_color="#F44336")  # red
+        self.sub_label.configure(text=f"Error: {error_msg}", text_color="#E32D2D")
+        self.progress_bar.configure(progress_color="#E32D2D")  # factorio red
 
     def mark_warning(self, error_msg: str):
         self.icon_label.configure(image=warning_icon)
@@ -58,24 +58,24 @@ class DownloadEntry:
     def mark_retrying(self, attempt: int, max_attempts: int):
         """Mark the download as retrying."""
         self.icon_label.configure(image=warning_icon)  # orange warning icon
-        self.sub_label.configure(text=f"Retrying... ({attempt}/{max_attempts})")
-        self.progress_bar.configure(progress_color="#FFA500")
+        self.sub_label.configure(text=f"Retrying... ({attempt}/{max_attempts})", text_color="#FF9F1C")
+        self.progress_bar.configure(progress_color="#FF9F1C")
 
 
 class DownloaderFrame(customtkinter.CTkScrollableFrame):
     """Scrollable frame displaying active downloads with progress bars."""
 
     def __init__(self, master, title):
-        super().__init__(master, height=500, width=300, label_text=title)
+        super().__init__(master, height=500, width=300, label_text=title, fg_color="#242322", label_fg_color="#3e3c38", label_text_color="#FF9F1C")
         self.grid_columnconfigure(0, weight=1)
         self.frames = []
 
-        self.container = customtkinter.CTkFrame(self)
+        self.container = customtkinter.CTkFrame(self, fg_color="transparent")
         self.container.pack(expand=True, fill="both", padx=5)
 
     def _setup_downloads_frame(self, label: str):
         """Setup the UI for one download entry, inside a bordered box."""
-        downloads_frame = customtkinter.CTkFrame(master=self.container)
+        downloads_frame = customtkinter.CTkFrame(master=self.container, fg_color="#1a1a1d", border_width=2, border_color="#3e3c38")
         downloads_frame.pack(fill="x", pady=5)  # more padding for separation
 
         label_container = customtkinter.CTkFrame(master=downloads_frame, fg_color="transparent")
@@ -88,7 +88,8 @@ class DownloaderFrame(customtkinter.CTkScrollableFrame):
         text_label = customtkinter.CTkLabel(
             master=label_container,
             text=f"{label}",
-            font=customtkinter.CTkFont(family="Segoe UI Emoji", weight="bold"),
+            font=customtkinter.CTkFont(family="Segoe UI Semibold", weight="bold"),
+            text_color="#E6E1D6",
             anchor="w",
             justify="left",
         )
@@ -99,7 +100,7 @@ class DownloaderFrame(customtkinter.CTkScrollableFrame):
             master=downloads_frame,
             text="Starting...",
             font=customtkinter.CTkFont(family="Segoe UI", size=11),
-            text_color=("grey80", "grey60"),
+            text_color="gray70",
             anchor="w",
             justify="left",
         )
@@ -111,6 +112,10 @@ class DownloaderFrame(customtkinter.CTkScrollableFrame):
             orientation="horizontal",
             width=260,
             mode="determinate",
+            progress_color="#FF9F1C",
+            fg_color="#242322",
+            border_color="#3e3c38",
+            border_width=1,
         )
         progress_bar.set(0)
         progress_bar.pack(side="top", fill="x", padx=12, pady=(4, 10))
@@ -143,11 +148,15 @@ class BodyFrame(customtkinter.CTkFrame):
             master: Parent widget (the main App)
             downloader_frame: Reference to the DownloaderFrame
         """
-        super().__init__(master)
-        self.frame_0 = customtkinter.CTkFrame(master=self)
-        self.frame_0.pack(expand=True, pady=10, padx=10)
-        self.frame_0.grid_rowconfigure(0, weight=1)
-        self.frame_0.rowconfigure(5, weight=1)
+        super().__init__(master, fg_color="#1a1a1d")
+        self.app = master
+        self.frame_0 = customtkinter.CTkFrame(master=self, fg_color="#2d2b29", border_width=2, border_color="#3e3c38")
+        self.frame_0.pack(expand=True, pady=10, padx=10, fill="both")
+        self.frame_0.grid_rowconfigure(0, weight=0)  # title
+        self.frame_0.grid_rowconfigure(1, weight=0)  # inputs
+        self.frame_0.grid_rowconfigure(2, weight=0)  # progress bar
+        self.frame_0.grid_rowconfigure(3, weight=1)  # log textbox — takes all remaining height
+        self.frame_0.grid_columnconfigure(0, weight=1)
 
         self.downloader_frame = downloader_frame
         self._setup_ui()
@@ -161,25 +170,25 @@ class BodyFrame(customtkinter.CTkFrame):
 
     def _setup_title_frame(self):
         """Setup title section with application info."""
-        self.title_frame = customtkinter.CTkFrame(master=self.frame_0)
-        self.title_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
-
+        self.title_frame = customtkinter.CTkFrame(master=self.frame_0, fg_color="#3e3c38", corner_radius=0)
+        self.title_frame.grid(row=0, column=0, sticky="new")
         self.title_frame.grid_rowconfigure(0, weight=1)
-        self.title_frame.rowconfigure(3, weight=1)
+        self.title_frame.grid_rowconfigure(3, weight=1)
 
         self.title_label = customtkinter.CTkLabel(
             master=self.title_frame,
             text="Factorio Mod Downloader",
+            text_color="#FF9F1C",
             font=customtkinter.CTkFont(family="Segoe UI Semibold", size=20, weight="bold"),
             anchor="w",
         )
-        self.title_label.grid(row=0, padx=10, sticky="nsew")
+        self.title_label.grid(row=0, padx=10, pady=(10, 0), sticky="nsew")
 
         self.title_sub_label = customtkinter.CTkLabel(
             master=self.title_frame,
             text="One Downloader for all your factorio mods.",
             font=customtkinter.CTkFont(family="Segoe UI"),
-            text_color=("grey74", "grey60"),
+            text_color="#E6E1D6",
         )
         self.title_sub_label.grid(row=1, padx=12, sticky="nsw")
 
@@ -190,10 +199,10 @@ class BodyFrame(customtkinter.CTkFrame):
             master=self.title_frame,
             text=github_url,
             font=customtkinter.CTkFont(family="Segoe UI Emoji"),
-            text_color=("grey60", "grey74"),
+            text_color="#A19D94",
             cursor="hand2",
         )
-        self.developer_label.grid(row=2, padx=12, sticky="nsw")
+        self.developer_label.grid(row=2, padx=12, pady=(0, 10), sticky="nsw")
         self.developer_label.bind(
             "<Button-1>",
             lambda e: self._callback(github_repo),
@@ -201,87 +210,79 @@ class BodyFrame(customtkinter.CTkFrame):
 
     def _setup_body_frame(self):
         """Setup input controls section."""
-        self.body_frame = customtkinter.CTkFrame(master=self.frame_0)
-        self.body_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
-        self.body_frame.grid_rowconfigure(0, weight=1)
-        self.body_frame.rowconfigure(3, weight=1)
-        self.body_frame.columnconfigure(4, weight=1)
+        self.body_frame = customtkinter.CTkFrame(master=self.frame_0, fg_color="transparent")
+        self.body_frame.grid(row=1, column=0, padx=10, pady=(10, 10), sticky="nsew")
+        self.body_frame.grid_columnconfigure(0, weight=1)
+        self.body_frame.grid_columnconfigure(3, weight=0)
+
+        self.mod_url_label = customtkinter.CTkLabel(
+            master=self.body_frame, text="Mod URL", text_color="#ff9f1c",
+            font=customtkinter.CTkFont(family="Segoe UI Semibold", weight="bold"), anchor="w"
+        )
+        self.mod_url_label.grid(row=0, column=0, columnspan=4, padx=10, pady=(10, 2), sticky="nsw")
 
         self.mod_url = customtkinter.CTkEntry(
-            self.body_frame, placeholder_text="Mod Url", width=500
+            self.body_frame, placeholder_text="Enter mod url here...", width=500,
+            fg_color="#1a1a1d", border_color="#3e3c38", text_color="#e6e1d6"
         )
-        self.mod_url.grid(row=0, column=0, columnspan=4, padx=10, pady=10, sticky="nsew")
+        self.mod_url.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 10), sticky="nsew")
+
+        self.fetch_deps_button = customtkinter.CTkButton(
+            master=self.body_frame, border_width=2,
+            border_color="#3e3c38", fg_color="#2d2b29", hover_color="#4a4743",
+            text_color="#ff9f1c", text="Check Deps", command=self._fetch_deps_action,
+        )
+        self.fetch_deps_button.grid(row=1, column=3, padx=10, pady=(0, 10), sticky="nsew")
+
+        self.download_path_label = customtkinter.CTkLabel(
+            master=self.body_frame, text="Download Path", text_color="#ff9f1c",
+            font=customtkinter.CTkFont(family="Segoe UI Semibold", weight="bold"), anchor="w"
+        )
+        self.download_path_label.grid(row=2, column=0, columnspan=4, padx=10, pady=(5, 2), sticky="nsw")
 
         self.download_path = customtkinter.CTkEntry(
-            self.body_frame, placeholder_text="Download Path", width=500
+            self.body_frame, placeholder_text="Enter output path here...", width=500,
+            fg_color="#1a1a1d", border_color="#3e3c38", text_color="#e6e1d6"
         )
-        self.download_path.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 10), sticky="nsew")
+        self.download_path.grid(row=3, column=0, columnspan=3, padx=10, pady=(0, 10), sticky="nsew")
 
         self.path_button = customtkinter.CTkButton(
-            master=self.body_frame,
-            border_width=2,
-            fg_color="transparent",
-            text_color=("gray10", "#DCE4EE"),
-            text="Select Path",
-            command=self._select_path,
+            master=self.body_frame, border_width=2,
+            border_color="#3e3c38", fg_color="#2d2b29", hover_color="#4a4743",
+            text_color="#ff9f1c", text="Browse", command=self._select_path,
         )
-        self.path_button.grid(row=1, column=3, padx=10, pady=(0, 10), sticky="nsew")
+        self.path_button.grid(row=3, column=3, padx=10, pady=(0, 10), sticky="nsew")
 
-        optional_deps_container = customtkinter.CTkFrame(
-            master=self.body_frame, fg_color="transparent"
+        self.deps_container = customtkinter.CTkScrollableFrame(
+            master=self.body_frame, fg_color="#1a1a1d", border_color="#3e3c38", border_width=2, height=100
         )
-        optional_deps_container.grid(
-            row=2, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="nsew"
-        )
+        self.deps_container.grid(row=4, column=0, columnspan=4, padx=10, pady=(10, 10), sticky="nsew")
+        
+        self.optional_deps_vars = {}
 
-        self.optional_deps = customtkinter.BooleanVar(value=False)
-        self.optional_deps_checkbox = customtkinter.CTkCheckBox(
-            master=optional_deps_container,
-            text="",
-            width=24,
-            variable=self.optional_deps,
-            font=customtkinter.CTkFont(family="Segoe UI"),
+        deps_prompt = customtkinter.CTkLabel(
+            self.deps_container, text="Click 'Check Deps' to load dependencies.", text_color="#A19D94"
         )
-        self.optional_deps_checkbox.pack(side="left", padx=(0, 0))
-
-        icon_label = customtkinter.CTkLabel(
-            master=optional_deps_container, image=warning_icon, text=""
-        )
-        icon_label.pack(side="left")
-
-        text_label = customtkinter.CTkLabel(
-            master=optional_deps_container,
-            text=f"Download optional dependencies (may significantly increase the number and size of downloads).",
-            font=customtkinter.CTkFont(family="Segoe UI"),
-            anchor="w",
-            justify="left",
-        )
-        text_label.pack(side="left", padx=(8, 0), fill="x", expand=True)
+        deps_prompt.grid(row=0, column=0, padx=5, pady=2, sticky="w")
 
         self.download_button = customtkinter.CTkButton(
-            master=self.body_frame,
-            text="Start Download",
-            command=self._download_button_action,
-            fg_color=["#3a7ebf", "#1f538d"],
-            hover_color=["#325882", "#14375e"],
-            border_color=["#3E454A", "#949A9F"],
-            text_color=["#DCE4EE", "#DCE4EE"],
-            text_color_disabled=["gray74", "gray60"],
+            master=self.body_frame, text="START DOWNLOAD", command=self._download_button_action,
+            font=customtkinter.CTkFont(family="Segoe UI Semibold", size=16, weight="bold"),
+            fg_color="#ff9f1c", hover_color="#d97706", border_color="#92400e", border_width=2,
+            text_color="#1a1a1d", text_color_disabled="gray30", height=40,
         )
-        self.download_button.grid(
-            row=3, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="nsew"
-        )
+        self.download_button.grid(row=5, column=0, columnspan=4, padx=10, pady=(10, 10), sticky="nsew")
 
     def _setup_downloads_frame(self):
         """Setup progress tracking section."""
-        self.downloads_frame = customtkinter.CTkFrame(master=self.frame_0)
+        self.downloads_frame = customtkinter.CTkFrame(master=self.frame_0, fg_color="transparent")
         self.downloads_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
 
         self.progress_file = customtkinter.CTkLabel(
             master=self.downloads_frame,
             text="Start download to see progress.",
             font=customtkinter.CTkFont(family="Segoe UI"),
-            text_color=("grey74", "grey60"),
+            text_color="#e6e1d6",
         )
         self.progress_file.grid(row=0, padx=12, sticky="nsw")
 
@@ -291,6 +292,10 @@ class BodyFrame(customtkinter.CTkFrame):
             width=660,
             mode="indeterminate",
             indeterminate_speed=1,
+            progress_color="#FF9F1C",
+            fg_color="#1a1a1d",
+            border_color="#3e3c38",
+            border_width=1,
         )
         self.progressbar.grid(row=1, column=0, padx=(10, 10), pady=(5, 10), sticky="ns")
         self.progressbar.start()
@@ -299,7 +304,10 @@ class BodyFrame(customtkinter.CTkFrame):
         """Setup logs section."""
         self.textbox = customtkinter.CTkTextbox(
             master=self.frame_0,
-            border_width=0,
+            border_width=2,
+            border_color="#3e3c38",
+            fg_color="#1a1a1d",
+            text_color="#65a63f",
             width=680,
             font=customtkinter.CTkFont(family="Cascadia Mono"),
         )
@@ -391,10 +399,10 @@ class BodyFrame(customtkinter.CTkFrame):
         os.makedirs(download_path, exist_ok=True)
 
         try:
-            # Import here to avoid circular imports
+            selected_optional = {mod for mod, var in self.optional_deps_vars.items() if var.get()}
             from factorio_mod_downloader.downloader.mod_downloader import ModDownloader
 
-            mod_downloader = ModDownloader(mod_url, download_path, self)
+            mod_downloader = ModDownloader(mod_url, download_path, self.app, selected_optional_deps=selected_optional)
             mod_downloader.start()
 
         except Exception as e:
@@ -407,3 +415,66 @@ class BodyFrame(customtkinter.CTkFrame):
             )
             self.download_button.configure(state="normal", text="Start Download")
             self.path_button.configure(state="normal")
+
+    def _fetch_deps_action(self):
+        mod_url = self.mod_url.get().strip()
+        if not mod_url or not re.match(r"^https://mods\.factorio\.com/mod/.*", mod_url):
+            CTkMessagebox(
+                title="Error", width=500, message="Please provide a valid mod_url to check dependencies!", icon="cancel"
+            )
+            return
+
+        self.fetch_deps_button.configure(state="disabled", text="Fetching...")
+        
+        # Clear existing checkboxes
+        for widget in self.deps_container.winfo_children():
+            widget.destroy()
+            
+        lbl = customtkinter.CTkLabel(self.deps_container, text="Fetching dependencies...", text_color="#A19D94")
+        lbl.grid(row=0, column=0, padx=5, pady=2, sticky="w")
+        
+        from factorio_mod_downloader.downloader.mod_downloader import DependencyFetcher
+        fetcher = DependencyFetcher(mod_url, self.app)
+        fetcher.start()
+
+    def on_deps_fetched(self, required_mods, optional_mods):
+        self.fetch_deps_button.configure(state="normal", text="Check Deps")
+        
+        for widget in self.deps_container.winfo_children():
+            widget.destroy()
+            
+        self.optional_deps_vars.clear()
+        
+        row_idx = 0
+        
+        if not required_mods and not optional_mods:
+            lbl = customtkinter.CTkLabel(
+                self.deps_container, text="No dependencies found.", text_color="#e6e1d6"
+            )
+            lbl.grid(row=row_idx, column=0, padx=5, pady=2, sticky="w")
+            return
+
+        for mod in required_mods:
+            var = customtkinter.BooleanVar(value=True)
+            cb = customtkinter.CTkCheckBox(
+                master=self.deps_container, text=f"[Required] {mod}", variable=var, state="disabled",
+                fg_color="#3e3c38", border_color="#ff9f1c", checkmark_color="#1a1a1d"
+            )
+            cb.grid(row=row_idx, column=0, padx=5, pady=2, sticky="w")
+            row_idx += 1
+            
+        for mod in optional_mods:
+            var = customtkinter.BooleanVar(value=False)
+            self.optional_deps_vars[mod] = var
+            cb = customtkinter.CTkCheckBox(
+                master=self.deps_container, text=f"[Optional] {mod}", variable=var,
+                fg_color="#3e3c38", border_color="#ff9f1c", checkmark_color="#1a1a1d", hover_color="#4a4743", text_color="#e6e1d6"
+            )
+            cb.grid(row=row_idx, column=0, padx=5, pady=2, sticky="w")
+            row_idx += 1
+
+    def on_deps_failed(self, error):
+        self.fetch_deps_button.configure(state="normal", text="Check Deps")
+        CTkMessagebox(
+            title="Error", width=500, message=f"Failed to fetch dependencies:\n{error}", icon="cancel"
+        )

@@ -19,11 +19,14 @@ def resource_path(relative_path: str) -> str:
     Returns:
         Absolute path to the resource file
     """
-    PROJECT_ROOT = Path(__file__).resolve().parent.parent
-    ASSETS_DIR = PROJECT_ROOT / "assets"
     if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, ASSETS_DIR, relative_path)
-    return os.path.join(ASSETS_DIR, relative_path)
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        return os.path.join(sys._MEIPASS, "assets", relative_path)
+    
+    # In development, assets are in src/factorio_mod_downloader/assets
+    # Path(__file__) is .../src/factorio_mod_downloader/gui/utils.py
+    base_path = Path(__file__).resolve().parent.parent / "assets"
+    return os.path.join(base_path, relative_path)
 
 
 def ensure_directory_exists(path: str) -> Path:
